@@ -1,28 +1,133 @@
 ---
-title: ""
-author: ""
-format:
-  html:
-    embed-resources: true
+title: "Lab6"
+author: "Derek Walker"
+format: html
+editor: visual
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+## Question 1
 
 ```{r}
-1 + 1
+install.packages("tidytext")
+library(readr)
+library(dplyr)
+library(tidytext)
+library(tidyverse)
+library(ggplot2)
+
+mt_samples <- read_csv("https://raw.githubusercontent.com/USCbiostats/data-science-data/master/00_mtsamples/mtsamples.csv")
+mt_samples <- mt_samples %>%
+  select(description, medical_specialty, transcription)
+
+head(mt_samples)
+
+mt_samples %>%
+  count(medical_specialty, sort = TRUE)
 ```
 
-You can add options to executable code like this
+There appear to be 40 different specialties. Not all the specialty groups have the same number of people. The range is from 6 to 1103 people.
+
+## Question 2
 
 ```{r}
-#| echo: false
-2 * 2
+mt_samples %>%
+  unnest_tokens(word, transcription) %>%
+  count(word, sort=TRUE) %>%
+  top_n(n = 20, wt = n) %>%
+  ggplot(aes(x = n, y = fct_reorder(word, n))) +
+  geom_col()
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+A large majority of the words are either articles, prepositions, or conjunctions. This we would expect.The first word other than any of these is "patient" (noun) which we observe 22,065 times.
+
+## Question 3
+
+```{r}
+library(stringr)
+number_words <-as.character(seq(0, 100))
+
+mt_samples %>%
+  unnest_tokens(word, transcription)%>%
+  filter(!(word%in% as.character(seq(0,100))))%>%
+  count (word, sort=TRUE) %>%
+  top_n(20,n) %>%
+  ggplot(aes(x = n, y = fct_reorder(word, n))) +
+  geom_col()
+
+mt_samples %>%
+ unnest_tokens(word, transcription) %>%
+  filter(!(word%in% as.character(seq(0,100))))%>%
+  anti_join(stop_words, by = c("word")) %>%
+  count(word, sort = TRUE) %>%
+  top_n(10, n) %>%
+  ggplot(aes(n, fct_reorder(word, n))) +
+  geom_col()
+```
+
+Yes it does give a better idea of what the text is about. Words such as patient, procedure and pain that show up a lot indicate the text is about health/medicine.
+
+## Question 4
+
+```{r}
+mt_samples %>%
+  unnest_ngrams(output = token, input = transcription, n = 2) %>%
+  count(token, sort=TRUE) %>%
+  top_n(n = 20, wt = n) %>%
+  ggplot(aes(x = n, y = fct_reorder(token, n))) +
+  geom_col()
+
+mt_samples %>%
+  unnest_ngrams(output = token, input = transcription, n = 3) %>%
+  count(token, sort=TRUE) %>%
+  top_n(n = 20, wt = n) %>%
+  ggplot(aes(x = n, y = fct_reorder(token, n))) +
+  geom_col()
+
+```
+
+Using tri-grams you are able to get a better description about what the text is about.
+
+## Question 5
+
+```{r}
+library(tidyr)
+mt_bigrams <- mt_samples %>%
+  unnest_ngrams(output = token, input = transcription, n = 2) %>%
+  separate(col = token, into =c("word1", "word2"), sep = " ") %>%
+  select(word1, word2)
+  
+mt_bigrams %>%
+  filter(word1 == "medical") %>%
+  count (word2, sort = TRUE)
+
+mt_bigrams %>%
+  filter(word2 == "medical") %>%
+  count (word1, sort = TRUE)
+
+mt_bigrams %>%
+  count(word1, word2, sort = TRUE)
+
+mt_bigrams %>%
+  anti_join(
+    tidytext :: stop_words %>% select(word), by =c("word1" = "word")
+  ) %>%
+  anti_join(
+    tidytext :: stop_words %>% select(word), by =c("word2" = "word")
+  ) %>%
+  count(word1, word2, sort = TRUE)
+
+```
+
+## Question 6
+
+```{r}
+mt_samples %>% 
+  unnest_tokens(token, transcription) %>%
+  anti_join(tidytext :: stop_words, by = c("token" = "word")) %>%
+  group_by(medical_specialty) %>%
+  count(token) %>%
+  top_n(5,n)
+```
+
+Question 7
+
